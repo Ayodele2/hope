@@ -1,45 +1,33 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
-  StatusBar,
+  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+
 export default function LoginScreen() {
-  const { role } = useLocalSearchParams<{ role: string }>();
+  const params = useLocalSearchParams<{ role?: string }>();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const roleName =
-    role === "hospital"
-      ? "Referring Hospital"
-      : role === "dispatcher"
-        ? "HOPE Dispatcher"
-        : role === "ambulance"
-          ? "Ambulance Operator"
-          : "Receiving Hospital";
+  const role = params.role ?? "unknown";
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-
       <KeyboardAvoidingView
-        style={styles.keyboardView}
+        style={styles.keyboardContainer}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={styles.content}>
           <TouchableOpacity
             style={styles.backButton}
+            activeOpacity={0.7}
             onPress={() => router.back()}
           >
-            <Text style={styles.backText}>‹</Text>
+            <Text style={styles.backText}>‹ Back</Text>
           </TouchableOpacity>
 
           <View style={styles.header}>
@@ -47,69 +35,66 @@ export default function LoginScreen() {
 
             <Text style={styles.title}>Welcome back</Text>
 
-            <Text style={styles.subtitle}>Sign in as {roleName}</Text>
+            <Text style={styles.subtitle}>
+              Sign in to continue coordinating patient care.
+            </Text>
           </View>
 
           <View style={styles.form}>
-            <View style={styles.inputContainer}>
+            <View style={styles.inputGroup}>
               <Text style={styles.label}>Email address</Text>
 
               <TextInput
                 style={styles.input}
                 placeholder="Enter your email"
                 placeholderTextColor="#94A3B8"
-                value={email}
-                onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
             </View>
 
-            <View style={styles.inputContainer}>
+            <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
 
               <TextInput
                 style={styles.input}
                 placeholder="Enter your password"
                 placeholderTextColor="#94A3B8"
-                value={password}
-                onChangeText={setPassword}
                 secureTextEntry
               />
             </View>
 
-            <TouchableOpacity>
-              <Text style={styles.forgotPassword}>Forgot password?</Text>
+            <TouchableOpacity style={styles.forgotButton} activeOpacity={0.7}>
+              <Text style={styles.forgotText}>Forgot password?</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.loginButton}
               activeOpacity={0.8}
               onPress={() => {
-                console.log("Login:", {
-                  email,
-                  password,
-                  role,
-                });
+                console.log("Login submitted for role:", role);
               }}
             >
               <Text style={styles.loginButtonText}>Sign In</Text>
             </TouchableOpacity>
+          </View>
 
-            <View style={styles.signupContainer}>
-              <Text style={styles.signupText}>Don't have an account?</Text>
+          <View style={styles.signupContainer}>
+            <Text style={styles.signupText}>Don't have an account?</Text>
 
-              <TouchableOpacity
-                onPress={() => {
-                  router.push({
-                    pathname: "/signup",
-                    params: { role },
-                  });
-                }}
-              >
-                <Text style={styles.signupLink}> Create account</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() =>
+                router.push({
+                  pathname: "/signup",
+                  params: {
+                    role,
+                  },
+                })
+              }
+            >
+              <Text style={styles.signupLink}> Create an account</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -120,38 +105,34 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#FFFFFF",
   },
 
-  keyboardView: {
+  keyboardContainer: {
     flex: 1,
   },
 
   content: {
     flex: 1,
     paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
 
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
+    alignSelf: "flex-start",
+    paddingVertical: 8,
   },
 
   backText: {
-    fontSize: 32,
-    color: "#0F172A",
-    lineHeight: 36,
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#0F766E",
   },
 
   header: {
     marginTop: 42,
+    marginBottom: 36,
   },
 
   logo: {
@@ -159,7 +140,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 2,
     color: "#0F766E",
-    marginBottom: 24,
+    marginBottom: 18,
   },
 
   title: {
@@ -169,74 +150,76 @@ const styles = StyleSheet.create({
   },
 
   subtitle: {
-    fontSize: 16,
+    marginTop: 10,
+    fontSize: 15,
+    lineHeight: 23,
     color: "#64748B",
-    marginTop: 8,
   },
 
   form: {
-    marginTop: 40,
+    gap: 18,
   },
 
-  inputContainer: {
-    marginBottom: 20,
+  inputGroup: {
+    gap: 8,
   },
 
   label: {
     fontSize: 14,
     fontWeight: "600",
     color: "#334155",
-    marginBottom: 8,
   },
 
   input: {
-    height: 56,
-    borderRadius: 14,
+    height: 54,
     borderWidth: 1,
     borderColor: "#CBD5E1",
-    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
     paddingHorizontal: 16,
-    fontSize: 16,
+    fontSize: 15,
     color: "#0F172A",
+    backgroundColor: "#FFFFFF",
   },
 
-  forgotPassword: {
-    textAlign: "right",
-    color: "#0F766E",
-    fontSize: 14,
+  forgotButton: {
+    alignSelf: "flex-end",
+  },
+
+  forgotText: {
+    fontSize: 13,
     fontWeight: "600",
-    marginTop: -4,
-    marginBottom: 28,
+    color: "#0F766E",
   },
 
   loginButton: {
-    height: 56,
-    borderRadius: 16,
+    height: 54,
+    borderRadius: 13,
     backgroundColor: "#0F766E",
     alignItems: "center",
     justifyContent: "center",
+    marginTop: 4,
   },
 
   loginButtonText: {
-    color: "#FFFFFF",
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "700",
+    color: "#FFFFFF",
   },
 
   signupContainer: {
     flexDirection: "row",
     justifyContent: "center",
-    marginTop: 24,
+    marginTop: "auto",
   },
 
   signupText: {
-    color: "#64748B",
     fontSize: 14,
+    color: "#64748B",
   },
 
   signupLink: {
-    color: "#0F766E",
     fontSize: 14,
     fontWeight: "700",
+    color: "#0F766E",
   },
 });
