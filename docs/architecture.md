@@ -41,3 +41,22 @@ Mobile App <-> Socket.IO <-> Backend
 
 External services will be introduced only when required.
 ```
+
+## Hospital Application Shell
+
+The hospital mobile experience is organized as a route group:
+
+src/app/(hospital)/
+
+The group currently contains:
+
+- Home
+- Transfers
+- Messages
+- Profile
+
+The application uses bottom tabs for persistent top-level navigation.
+
+The hospital dashboard currently uses temporary mock data.
+
+Real hospital, user and transfer data will be introduced after backend authentication and database integration.

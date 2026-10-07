@@ -72,7 +72,15 @@ export default function LoginScreen() {
               style={styles.loginButton}
               activeOpacity={0.8}
               onPress={() => {
-                console.log("Login submitted for role:", role);
+                if (
+                  role === "referring_hospital" ||
+                  role === "receiving_hospital"
+                ) {
+                  router.replace("/(hospital)/home");
+                  return;
+                }
+
+                console.log("Selected role:", role);
               }}
             >
               <Text style={styles.loginButtonText}>Sign In</Text>
