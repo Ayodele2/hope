@@ -107,3 +107,75 @@ The selected role is only used for navigation and must not be considered a secur
 ### Next Milestone
 
 Hospital application shell.
+
+## Milestone 3 — Hospital Application Shell
+
+Status: In progress
+
+### Goals
+
+- Create hospital route group
+- Create hospital tab navigation
+- Create Home screen
+- Create Transfers screen
+- Create Messages screen
+- Create Profile screen
+- Establish temporary hospital navigation after frontend login
+
+### Completed
+
+- Hospital route group created
+- Bottom tab navigation created
+- Hospital Home created
+- Transfers screen created
+- Messages screen created
+- Profile screen created
+- Temporary frontend login-to-hospital navigation established
+
+### Important Limitation
+
+The hospital application currently uses temporary mock data.
+
+Authentication is still frontend-only.
+
+No backend or database is connected.
+
+### Next Milestone
+
+Create Transfer Request UI.
+
+## Milestone 5 — Transfer Domain Model
+
+Status: In progress
+
+### Goal
+
+Define the core transfer domain before implementing the backend.
+
+### Completed
+
+Created the TransferRequest type.
+
+Created transfer status definitions.
+
+Created active and terminal status groups.
+
+Created temporary transfer ID generation.
+
+Created TransferEvent type for transfer history.
+
+### Important architectural decision
+
+Transfer status and transfer history are separate concepts.
+
+The status represents the current state.
+
+Transfer events represent what happened throughout the transfer lifecycle.
+
+### Backend status
+
+No backend has been implemented yet.
+
+No database has been implemented yet.
+
+The domain model is currently represented with TypeScript types.

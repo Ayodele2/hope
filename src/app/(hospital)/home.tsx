@@ -1,11 +1,11 @@
 import { router } from "expo-router";
 import {
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const activeTransfers = [
@@ -65,10 +65,7 @@ export default function HospitalHomeScreen() {
         <TouchableOpacity
           style={styles.createTransferButton}
           activeOpacity={0.8}
-          onPress={() => {
-            // Transfer creation will be implemented in a later milestone.
-            console.log("Create transfer pressed");
-          }}
+          onPress={() => router.push("/create-transfer")}
         >
           <View style={styles.createIcon}>
             <Text style={styles.createIconText}>+</Text>
