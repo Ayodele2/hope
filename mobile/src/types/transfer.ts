@@ -45,24 +45,17 @@ export type AmbulanceRequirements = {
 
 export type TransferRequest = {
   id: string;
-
   patient: TransferPatient;
-
   medical: MedicalInformation;
-
   urgency: TransferUrgency;
-
   receivingHospitalId: string;
-
   medicalSupport: MedicalSupport[];
-
   ambulance: AmbulanceRequirements;
-
   status: TransferStatus;
-
   createdAt: string;
   updatedAt: string;
 };
+
 export type TransferEventType =
   | "created"
   | "submitted"
@@ -79,12 +72,15 @@ export type TransferEventType =
   | "rejected"
   | "cancelled"
   | "delayed"
-  | "transfer_failed";
+  | "transfer_failed"
+  | "status_changed";
 
 export type TransferEvent = {
   id: string;
   transferId: string;
   type: TransferEventType;
   note?: string;
+  previousStatus?: TransferStatus;
+  newStatus?: TransferStatus;
   createdAt: string;
 };

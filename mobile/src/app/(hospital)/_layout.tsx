@@ -42,6 +42,17 @@ export default function HospitalLayout() {
       />
 
       <Tabs.Screen
+        name="transfer-details"
+        options={{
+          title: "Details",
+          tabBarIcon: ({ color }) => (
+            <Text style={{ color, fontSize: 20 }}>▤</Text>
+          ),
+          href: null,
+        }}
+      />
+
+      <Tabs.Screen
         name="messages"
         options={{
           title: "Messages",

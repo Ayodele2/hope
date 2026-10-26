@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TransferUrgency {
+  ROUTINE
+  URGENT
+  EMERGENCY
+}
+
+enum TransferStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  RECEIVING_HOSPITAL_REQUESTED
+  RECEIVING_HOSPITAL_ACCEPTED
+  AMBULANCE_SEARCH
+  AMBULANCE_ASSIGNED
+  AMBULANCE_EN_ROUTE_TO_PICKUP
+  PATIENT_PICKED_UP
+  IN_TRANSIT
+  ARRIVED
+  HANDED_OVER
+  COMPLETED
+  REJECTED
+  CANCELLED
+  DELAYED
+  TRANSFER_FAILED
+}
+
+model Transfer {
+  id                  String         @id @default(cuid())
+  patientName         String
+  patientAge          Int
+  patientGender       String
+  primaryCondition    String
+  currentCondition    String
+  urgency             TransferUrgency
+  receivingHospitalId String
+  medicalSupport      String[]
+  ambulanceType       String
+  oxygenRequired      Boolean        @default(false)
+  monitoringRequired  Boolean        @default(false)
+  status              TransferStatus @default(SUBMITTED)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@index([status])
+  @@index([receivingHospitalId])
+  @@index([createdAt])
+}

@@ -1,50 +1,94 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  BackHandler,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useTransfers } from "../store/TransferContext";
+import type {
+  AmbulanceType,
+  MedicalSupport,
+  PatientGender,
+  TransferRequest,
+  TransferUrgency,
+} from "../types/transfer";
 
-type Urgency = "routine" | "urgent" | "emergency";
+import { createTransferId } from "../utils/transfer";
 
 type TransferForm = {
   patientName: string;
   patientAge: string;
-  patientGender: string;
+  patientGender: PatientGender | "";
   medicalCondition: string;
   currentCondition: string;
-  urgency: Urgency | "";
+  urgency: TransferUrgency | "";
   receivingHospital: string;
-  medicalSupport: string[];
-  ambulanceType: string;
+  medicalSupport: MedicalSupport[];
+  ambulanceType: AmbulanceType | "";
   oxygenRequired: boolean;
   monitoringRequired: boolean;
 };
 
+type FormErrors = Partial<Record<keyof TransferForm, string>>;
+
 const TOTAL_STEPS = 7;
 
-export default function CreateTransferScreen() {
-  const [step, setStep] = useState(1);
+const GENDER_OPTIONS: { label: string; value: PatientGender }[] = [
+  { label: "Male", value: "male" },
+  { label: "Female", value: "female" },
+  { label: "Other", value: "other" },
+];
 
-  const [form, setForm] = useState<TransferForm>({
-    patientName: "",
-    patientAge: "",
-    patientGender: "",
-    medicalCondition: "",
-    currentCondition: "",
-    urgency: "",
-    receivingHospital: "",
-    medicalSupport: [],
-    ambulanceType: "",
-    oxygenRequired: false,
-    monitoringRequired: false,
-  });
+const SUPPORT_OPTIONS: { label: string; value: MedicalSupport }[] = [
+  { label: "Doctor", value: "doctor" },
+  { label: "Nurse", value: "nurse" },
+  { label: "Critical care support", value: "critical_care" },
+];
+
+const INITIAL_FORM: TransferForm = {
+  patientName: "",
+  patientAge: "",
+  patientGender: "",
+  medicalCondition: "",
+  currentCondition: "",
+  urgency: "",
+  receivingHospital: "",
+  medicalSupport: [],
+  ambulanceType: "",
+  oxygenRequired: false,
+  monitoringRequired: false,
+};
+
+export default function CreateTransferScreen() {
+  const { addTransfer } = useTransfers();
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState<TransferForm>(INITIAL_FORM);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const scrollRef = useRef<ScrollView>(null);
+
+  const hasEnteredData =
+    form.patientName.trim() !== "" ||
+    form.patientAge.trim() !== "" ||
+    form.patientGender !== "" ||
+    form.medicalCondition.trim() !== "" ||
+    form.currentCondition.trim() !== "" ||
+    form.urgency !== "" ||
+    form.receivingHospital.trim() !== "" ||
+    form.medicalSupport.length > 0 ||
+    form.ambulanceType !== "" ||
+    form.oxygenRequired ||
+    form.monitoringRequired;
 
   const updateForm = <K extends keyof TransferForm>(
     field: K,
@@ -54,9 +98,20 @@ export default function CreateTransferScreen() {
       ...current,
       [field]: value,
     }));
+
+    // Clear the inline error for this field as soon as the user edits it.
+    setErrors((current) => {
+      if (!current[field]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
   };
 
-  const toggleMedicalSupport = (support: string) => {
+  const toggleMedicalSupport = (support: MedicalSupport) => {
     setForm((current) => {
       const exists = current.medicalSupport.includes(support);
 
@@ -69,76 +124,92 @@ export default function CreateTransferScreen() {
     });
   };
 
+  const buildTransferRequest = (): TransferRequest => {
+    const now = new Date().toISOString();
+
+    return {
+      id: createTransferId(),
+
+      patient: {
+        name: form.patientName.trim(),
+        age: Number(form.patientAge),
+        gender: form.patientGender as PatientGender,
+      },
+
+      medical: {
+        primaryCondition: form.medicalCondition.trim(),
+        currentCondition: form.currentCondition.trim(),
+      },
+
+      urgency: form.urgency as TransferUrgency,
+
+      // Free text for now. Replace with a real hospital ID once hospital
+      // search / verified selection is connected to the backend.
+      receivingHospitalId: form.receivingHospital.trim(),
+
+      medicalSupport: form.medicalSupport,
+
+      ambulance: {
+        type: form.ambulanceType as AmbulanceType,
+        oxygenRequired: form.oxygenRequired,
+        monitoringRequired: form.monitoringRequired,
+      },
+
+      status: "draft",
+
+      createdAt: now,
+      updatedAt: now,
+    };
+  };
+
   const validateStep = () => {
+    const nextErrors: FormErrors = {};
+
     if (step === 1) {
       if (!form.patientName.trim()) {
-        Alert.alert("Missing information", "Please enter the patient's name.");
-        return false;
+        nextErrors.patientName = "Please enter the patient's name.";
       }
 
+      const age = Number(form.patientAge);
+
       if (!form.patientAge.trim()) {
-        Alert.alert("Missing information", "Please enter the patient's age.");
-        return false;
+        nextErrors.patientAge = "Please enter the patient's age.";
+      } else if (!Number.isInteger(age) || age < 0 || age > 120) {
+        nextErrors.patientAge = "Please enter a valid age (0 - 120).";
       }
 
       if (!form.patientGender) {
-        Alert.alert(
-          "Missing information",
-          "Please select the patient's gender.",
-        );
-        return false;
+        nextErrors.patientGender = "Please select the patient's gender.";
       }
     }
 
     if (step === 2) {
       if (!form.medicalCondition.trim()) {
-        Alert.alert(
-          "Missing information",
-          "Please describe the patient's medical condition.",
-        );
-        return false;
+        nextErrors.medicalCondition =
+          "Please describe the patient's medical condition.";
       }
 
       if (!form.currentCondition.trim()) {
-        Alert.alert(
-          "Missing information",
-          "Please describe the patient's current condition.",
-        );
-        return false;
+        nextErrors.currentCondition =
+          "Please describe the patient's current condition.";
       }
     }
 
-    if (step === 3) {
-      if (!form.urgency) {
-        Alert.alert(
-          "Missing information",
-          "Please select the transfer urgency.",
-        );
-        return false;
-      }
+    if (step === 3 && !form.urgency) {
+      nextErrors.urgency = "Please select the transfer urgency.";
     }
 
-    if (step === 4) {
-      if (!form.receivingHospital.trim()) {
-        Alert.alert(
-          "Missing information",
-          "Please enter the receiving hospital.",
-        );
-        return false;
-      }
+    if (step === 4 && !form.receivingHospital.trim()) {
+      nextErrors.receivingHospital = "Please enter the receiving hospital.";
     }
 
-    if (step === 6) {
-      if (!form.ambulanceType) {
-        Alert.alert(
-          "Missing information",
-          "Please select the ambulance requirement.",
-        );
-        return false;
-      }
+    if (step === 6 && !form.ambulanceType) {
+      nextErrors.ambulanceType = "Please select the ambulance requirement.";
     }
 
-    return true;
+    setErrors(nextErrors);
+
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleNext = () => {
@@ -153,24 +224,80 @@ export default function CreateTransferScreen() {
 
   const handleBack = () => {
     if (step > 1) {
+      setErrors({});
       setStep((current) => current - 1);
+      return;
+    }
+
+    if (hasEnteredData) {
+      Alert.alert(
+        "Discard transfer request?",
+        "The information you entered will be lost.",
+        [
+          { text: "Keep editing", style: "cancel" },
+          {
+            text: "Discard",
+            style: "destructive",
+            onPress: () => router.back(),
+          },
+        ],
+      );
       return;
     }
 
     router.back();
   };
 
-  const handleSubmit = () => {
-    Alert.alert(
-      "Demo submission",
-      "The transfer request is ready to be submitted. Backend submission will be implemented in a later milestone.",
-      [
-        {
-          text: "OK",
-          onPress: () => router.replace("/(hospital)/transfers"),
-        },
-      ],
+  // Route the Android hardware back button through handleBack.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        handleBack();
+        return true;
+      },
     );
+
+    return () => subscription.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, form]);
+
+  // Reset scroll position whenever the step changes.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [step]);
+
+  const handleSubmit = () => {
+    if (submitting) {
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const transfer = buildTransferRequest();
+
+      // Save the transfer so it can appear on the Transfers screen.
+      addTransfer(transfer);
+
+      Alert.alert(
+        "Transfer created",
+        `Transfer ${transfer.id} has been added to your transfers.`,
+        [
+          {
+            text: "View transfers",
+            onPress: () => router.replace("/(hospital)/transfers"),
+          },
+        ],
+      );
+    } catch {
+      setSubmitting(false);
+
+      Alert.alert(
+        "Unable to create transfer",
+        "Something went wrong. Please try again.",
+      );
+    }
   };
 
   const renderStep = () => {
@@ -187,6 +314,7 @@ export default function CreateTransferScreen() {
               label="Patient name"
               placeholder="Enter patient name"
               value={form.patientName}
+              error={errors.patientName}
               onChangeText={(value) => updateForm("patientName", value)}
             />
 
@@ -195,23 +323,31 @@ export default function CreateTransferScreen() {
               placeholder="Enter patient age"
               keyboardType="numeric"
               value={form.patientAge}
-              onChangeText={(value) => updateForm("patientAge", value)}
+              error={errors.patientAge}
+              onChangeText={(value) =>
+                updateForm(
+                  "patientAge",
+                  value.replace(/[^0-9]/g, "").slice(0, 3),
+                )
+              }
             />
 
             <Text style={styles.label}>Gender</Text>
 
             <View style={styles.optionRow}>
-              {["Male", "Female", "Other"].map((gender) => (
+              {GENDER_OPTIONS.map(({ label, value }) => (
                 <OptionButton
-                  key={gender}
-                  label={gender}
-                  selected={
-                    form.patientGender.toLowerCase() === gender.toLowerCase()
-                  }
-                  onPress={() => updateForm("patientGender", gender)}
+                  key={value}
+                  label={label}
+                  selected={form.patientGender === value}
+                  onPress={() => updateForm("patientGender", value)}
                 />
               ))}
             </View>
+
+            {errors.patientGender ? (
+              <Text style={styles.errorText}>{errors.patientGender}</Text>
+            ) : null}
           </View>
         );
 
@@ -228,6 +364,7 @@ export default function CreateTransferScreen() {
               label="Primary condition"
               placeholder="e.g. Severe abdominal pain"
               value={form.medicalCondition}
+              error={errors.medicalCondition}
               onChangeText={(value) => updateForm("medicalCondition", value)}
             />
 
@@ -236,6 +373,7 @@ export default function CreateTransferScreen() {
               placeholder="Describe the patient's current condition"
               multiline
               value={form.currentCondition}
+              error={errors.currentCondition}
               onChangeText={(value) => updateForm("currentCondition", value)}
             />
           </View>
@@ -269,6 +407,10 @@ export default function CreateTransferScreen() {
               selected={form.urgency === "emergency"}
               onPress={() => updateForm("urgency", "emergency")}
             />
+
+            {errors.urgency ? (
+              <Text style={styles.errorText}>{errors.urgency}</Text>
+            ) : null}
           </View>
         );
 
@@ -284,6 +426,7 @@ export default function CreateTransferScreen() {
               label="Hospital"
               placeholder="Enter receiving hospital"
               value={form.receivingHospital}
+              error={errors.receivingHospital}
               onChangeText={(value) => updateForm("receivingHospital", value)}
             />
 
@@ -302,21 +445,16 @@ export default function CreateTransferScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Required medical support</Text>
             <Text style={styles.sectionDescription}>
-              Select any support the patient may require during transfer.
+              Select any staff support the patient may require during transfer.
+              Oxygen and monitoring are set in the ambulance step.
             </Text>
 
-            {[
-              "Doctor",
-              "Nurse",
-              "Oxygen",
-              "Cardiac monitoring",
-              "Critical care support",
-            ].map((support) => (
+            {SUPPORT_OPTIONS.map(({ label, value }) => (
               <SelectableRow
-                key={support}
-                label={support}
-                selected={form.medicalSupport.includes(support)}
-                onPress={() => toggleMedicalSupport(support)}
+                key={value}
+                label={label}
+                selected={form.medicalSupport.includes(value)}
+                onPress={() => toggleMedicalSupport(value)}
               />
             ))}
           </View>
@@ -350,6 +488,10 @@ export default function CreateTransferScreen() {
               onPress={() => updateForm("ambulanceType", "critical_care")}
             />
 
+            {errors.ambulanceType ? (
+              <Text style={styles.errorText}>{errors.ambulanceType}</Text>
+            ) : null}
+
             <Text style={[styles.label, styles.supportLabel]}>
               Additional requirements
             </Text>
@@ -380,7 +522,10 @@ export default function CreateTransferScreen() {
 
             <ReviewRow label="Patient" value={form.patientName} />
             <ReviewRow label="Age" value={form.patientAge} />
-            <ReviewRow label="Gender" value={form.patientGender} />
+            <ReviewRow
+              label="Gender"
+              value={form.patientGender ? formatValue(form.patientGender) : ""}
+            />
             <ReviewRow
               label="Medical condition"
               value={form.medicalCondition}
@@ -398,7 +543,7 @@ export default function CreateTransferScreen() {
               label="Medical support"
               value={
                 form.medicalSupport.length > 0
-                  ? form.medicalSupport.join(", ")
+                  ? form.medicalSupport.map(formatValue).join(", ")
                   : "None selected"
               }
             />
@@ -432,52 +577,76 @@ export default function CreateTransferScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={handleBack} style={styles.backButton}>
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Create transfer</Text>
-          <Text style={styles.headerSubtitle}>
-            Step {step} of {TOTAL_STEPS}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.progressContainer}>
-        {Array.from({ length: TOTAL_STEPS }).map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.progressSegment,
-              index < step && styles.progressSegmentActive,
-            ]}
-          />
-        ))}
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {renderStep()}
-      </ScrollView>
+        <View style={styles.header}>
+          <Pressable
+            onPress={handleBack}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Text style={styles.backText}>‹</Text>
+          </Pressable>
 
-      <View style={styles.footer}>
-        {step < TOTAL_STEPS ? (
-          <Pressable style={styles.primaryButton} onPress={handleNext}>
-            <Text style={styles.primaryButtonText}>Continue</Text>
-          </Pressable>
-        ) : (
-          <Pressable style={styles.primaryButton} onPress={handleSubmit}>
-            <Text style={styles.primaryButtonText}>
-              Submit transfer request
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Create transfer</Text>
+            <Text style={styles.headerSubtitle}>
+              Step {step} of {TOTAL_STEPS}
             </Text>
-          </Pressable>
-        )}
-      </View>
+          </View>
+        </View>
+
+        <View style={styles.progressContainer}>
+          {Array.from({ length: TOTAL_STEPS }).map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.progressSegment,
+                index < step && styles.progressSegmentActive,
+              ]}
+            />
+          ))}
+        </View>
+
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {renderStep()}
+        </ScrollView>
+
+        <View style={styles.footer}>
+          {step < TOTAL_STEPS ? (
+            <Pressable
+              style={styles.primaryButton}
+              onPress={handleNext}
+              accessibilityRole="button"
+            >
+              <Text style={styles.primaryButtonText}>Continue</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              style={[
+                styles.primaryButton,
+                submitting && styles.primaryButtonDisabled,
+              ]}
+              onPress={handleSubmit}
+              disabled={submitting}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: submitting }}
+            >
+              <Text style={styles.primaryButtonText}>
+                Submit transfer request
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -489,6 +658,7 @@ type FieldProps = {
   onChangeText: (value: string) => void;
   multiline?: boolean;
   keyboardType?: "default" | "numeric";
+  error?: string;
 };
 
 function Field({
@@ -498,13 +668,18 @@ function Field({
   onChangeText,
   multiline = false,
   keyboardType = "default",
+  error,
 }: FieldProps) {
   return (
     <View style={styles.fieldContainer}>
       <Text style={styles.label}>{label}</Text>
 
       <TextInput
-        style={[styles.input, multiline && styles.multilineInput]}
+        style={[
+          styles.input,
+          multiline && styles.multilineInput,
+          !!error && styles.inputError,
+        ]}
         placeholder={placeholder}
         placeholderTextColor="#94A3B8"
         value={value}
@@ -512,7 +687,10 @@ function Field({
         multiline={multiline}
         keyboardType={keyboardType}
         textAlignVertical={multiline ? "top" : "center"}
+        accessibilityLabel={label}
       />
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 }
@@ -527,6 +705,8 @@ function OptionButton({ label, selected, onPress }: OptionButtonProps) {
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
       style={[styles.optionButton, selected && styles.optionButtonSelected]}
     >
       <Text
@@ -557,6 +737,8 @@ function UrgencyOption({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
       style={[styles.urgencyCard, selected && styles.urgencyCardSelected]}
     >
       <View style={styles.radioOuter}>
@@ -581,6 +763,8 @@ function SelectableRow({ label, selected, onPress }: SelectableRowProps) {
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
       style={[styles.selectableRow, selected && styles.selectableRowSelected]}
     >
       <Text
@@ -619,11 +803,15 @@ function formatValue(value: string) {
   }
 
   return value
-    .replaceAll("_", " ")
+    .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+
   container: {
     flex: 1,
     backgroundColor: "#F8FAFC",
@@ -732,6 +920,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#0F172A",
     backgroundColor: "#FFFFFF",
+  },
+
+  inputError: {
+    borderColor: "#DC2626",
+  },
+
+  errorText: {
+    marginTop: 6,
+    fontSize: 13,
+    color: "#DC2626",
   },
 
   multilineInput: {
@@ -931,6 +1129,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#0F766E",
+  },
+
+  primaryButtonDisabled: {
+    opacity: 0.6,
   },
 
   primaryButtonText: {

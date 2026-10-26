@@ -41,7 +41,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit"
   },
   "private": true
 }
